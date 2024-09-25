@@ -1,7 +1,8 @@
+// handles/handleMessage.js
+const fs = require('fs');
+const path = require('path'); // Assurez-vous d'importer path pour les chemins
 const sendMessage = require('./sendMessage');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
 
 // Importation dynamique des commandes
 const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
@@ -42,41 +43,45 @@ const handleMessage = async (event) => {
             sendMessage(senderId, reply);
         } catch (error) {
             console.error('Error calling the API:', error);
-            sendMessage(senderId, 'Sorry, something went wrong when processing the image.');
+            sendMessage(senderId, 'Désolé, une erreur s\'est produite lors du traitement de l\'image.');
         }
     } 
-    // Si c'est un message texte, gérer les commandes
+    // Si c'est un message texte, continuer la conversation
     else if (message.text) {
         const userText = message.text.trim().toLowerCase();
 
-        // Extraire le nom de la commande et le prompt
-        const [commandName, ...args] = userText.split(' '); // 'ai bonjour' devient ['ai', 'bonjour']
-        const prompt = args.join(' '); // Reconstituer le prompt
+        // Vérifier si l'utilisateur a demandé le menu
+        if (userText === 'menu') {
+            commands.menu(senderId); // Appeler la commande menu
+            return; // Sortir pour ne pas exécuter d'autres commandes
+        }
 
-        // Vérifier si la commande existe
-        if (commands[commandName]) {
-            // Appeler la commande dynamique
-            try {
-                await commands[commandName](senderId, prompt);
-            } catch (error) {
-                console.error(`Error executing command ${commandName}:`, error);
-                sendMessage(senderId, 'Sorry, something went wrong when executing your command.');
+        // Vérifier les autres commandes dynamiquement
+        for (const commandName in commands) {
+            if (userText.startsWith(commandName)) {
+                const commandPrompt = userText.replace(commandName, '').trim();
+                await commands[commandName](senderId, commandPrompt); // Appeler la commande correspondante
+                return; // Sortir après l'exécution de la commande
             }
-        } else {
-            // Si aucune commande, traiter avec Gemini par défaut
-            try {
-                const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/gemini', {
-                    prompt: userText,
-                    customId: senderId
-                });
-                const reply = response.data.message;
+        }
 
-                // Envoyer la réponse au user
-                sendMessage(senderId, reply);
-            } catch (error) {
-                console.error('Error calling the API:', error);
-                sendMessage(senderId, 'Sorry, something went wrong when processing your message.');
-            }
+        // Si aucune commande ne correspond, traiter comme un texte normal
+        // Exemple de gestion des réponses standards
+        const prompt = userText; // Vous pouvez ajuster cela si nécessaire
+        const customId = senderId;
+
+        try {
+            const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/gemini', {
+                prompt,
+                customId
+            });
+            const reply = response.data.message;
+
+            // Envoyer la réponse au user
+            sendMessage(senderId, reply);
+        } catch (error) {
+            console.error('Error calling the API:', error);
+            sendMessage(senderId, 'Désolé, une erreur s\'est produite lors du traitement de votre message.');
         }
     }
 };
