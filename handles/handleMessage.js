@@ -17,7 +17,7 @@ const handleMessage = async (event) => {
         const imageUrl = message.attachments[0].payload.url;
 
         // Appeler l'API Flask avec l'image
-        const prompt = "Please analyze the image and continue the conversation.";
+        const prompt = "Veuillez analyser l'image et continuer la conversation.";
         const customId = senderId;
 
         try {
