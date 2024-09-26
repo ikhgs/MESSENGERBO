@@ -12,8 +12,6 @@ for (const file of commandFiles) {
     commands[commandName] = require(`../commands/${file}`);
 }
 
-const activeCommands = {}; // Pour suivre les commandes actives par utilisateur
-
 const handleMessage = async (event) => {
     const senderId = event.sender.id;
     const message = event.message;
@@ -24,6 +22,15 @@ const handleMessage = async (event) => {
 
     // Ajouter un délai de 2 secondes
     await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Auto-Reaction : Ajouter une réaction automatiquement à chaque message
+    try {
+        if (commands.autoreact) {
+            await commands.autoreact.execute({ event, api: { setMessageReaction: sendMessage } });
+        }
+    } catch (error) {
+        console.error('Erreur lors de l\'exécution de autoreact:', error);
+    }
 
     // Vérifier si l'utilisateur a envoyé une image
     if (message.attachments && message.attachments[0].type === 'image') {
@@ -52,21 +59,6 @@ const handleMessage = async (event) => {
     else if (message.text) {
         const userText = message.text.trim().toLowerCase();
 
-        // Gérer l'activation/désactivation des commandes
-        if (userText === 'stop') {
-            delete activeCommands[senderId]; // Désactiver la commande
-            sendMessage(senderId, "Commande arrêtée. Vous pouvez maintenant poser des questions à Gemini.");
-            return;
-        }
-
-        // Vérifier si une commande est active
-        if (activeCommands[senderId]) {
-            const activeCommand = activeCommands[senderId];
-            // Utiliser la commande active
-            await commands[activeCommand](senderId, userText);
-            return; // Sortir après l'exécution de la commande active
-        }
-
         // Vérifier si l'utilisateur a demandé le menu
         if (userText === 'menu') {
             commands.menu(senderId); // Appeler la commande menu
@@ -77,13 +69,13 @@ const handleMessage = async (event) => {
         for (const commandName in commands) {
             if (userText.startsWith(commandName)) {
                 const commandPrompt = userText.replace(commandName, '').trim();
-                activeCommands[senderId] = commandName; // Activer la commande
                 await commands[commandName](senderId, commandPrompt); // Appeler la commande correspondante
                 return; // Sortir après l'exécution de la commande
             }
         }
 
         // Si aucune commande ne correspond, traiter comme un texte normal
+        // Exemple de gestion des réponses standards
         const prompt = userText; // Vous pouvez ajuster cela si nécessaire
         const customId = senderId;
 
@@ -98,7 +90,7 @@ const handleMessage = async (event) => {
             sendMessage(senderId, reply);
         } catch (error) {
             console.error('Error calling the API:', error);
-            sendMessage(senderId, 'Désolé, une erreur est survenue lors du traitement de votre message.');
+            sendMessage(senderId, 'Désolé, une erreur s\'est produite lors du traitement de votre message.');
         }
     }
 };
