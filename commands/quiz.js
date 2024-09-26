@@ -22,9 +22,6 @@ module.exports = async (senderId, prompt) => {
             return await askNewQuestion(senderId);
         }
 
-        // Envoyer un message de confirmation que le message a été reçu
-        await sendMessage(senderId, "🇲🇬 *Bruno* rédige sa réponse... un instant, s'il vous plaît 🍟\nMessage reçu, je prépare une réponse...");
-
         // Appeler l'API Open Trivia Database pour obtenir une question
         return await askNewQuestion(senderId);
     } catch (error) {
