@@ -3,12 +3,15 @@ const sendMessage = require('../handles/sendMessage'); // Importer la fonction s
 
 module.exports = async (senderId, prompt) => {
     try {
-        // Ajouter un délai de 2 secondes (facultatif)
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Test : Confirmer que le message a été reçu
+        await sendMessage(senderId, "Message reçu, je prépare une réponse...");
 
         // Appeler l'API GPT avec le prompt de l'utilisateur
         const apiUrl = `https://deku-rest-api.gleeze.com/new/gpt-3_5-turbo?prompt=${encodeURIComponent(prompt)}`;
         const response = await axios.get(apiUrl);
+
+        // Test : Confirmer que l'API a bien répondu
+        await sendMessage(senderId, "Réponse API reçue, envoi de la réponse...");
 
         // Récupérer la réponse de l'API
         const reply = response.data.message;
