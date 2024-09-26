@@ -8,7 +8,14 @@ let currentAnswer = null; // Variable pour stocker la réponse correcte
 const fetchQuestion = async () => {
     try {
         const response = await axios.get(`https://opentdb.com/api.php?amount=1&type=multiple`);
-        return response.data.results[0]; // Retourne la première question
+        
+        // Vérification de la réponse
+        if (response.data && response.data.results.length > 0) {
+            return response.data.results[0]; // Retourne la première question
+        } else {
+            console.error('Aucune question trouvée dans la réponse de l\'API.');
+            return null;
+        }
     } catch (error) {
         console.error('Erreur lors de la récupération de la question:', error);
         return null;
@@ -54,4 +61,3 @@ const quizCommand = async (senderId, userText) => {
 };
 
 module.exports = quizCommand;
-            
