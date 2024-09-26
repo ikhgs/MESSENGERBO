@@ -10,11 +10,11 @@ module.exports = async (senderId, prompt) => {
         const apiUrl = `https://deku-rest-api.gleeze.com/new/gpt-3_5-turbo?prompt=${encodeURIComponent(prompt)}`;
         const response = await axios.get(apiUrl);
 
+        // Vérifier la structure de la réponse et récupérer le texte
+        const reply = response.data.result.reply; // Récupérer la bonne clé dans la réponse
+
         // Test : Confirmer que l'API a bien répondu
         await sendMessage(senderId, "Réponse API reçue, envoi de la réponse...");
-
-        // Récupérer la réponse de l'API
-        const reply = response.data.message;
 
         // Envoyer la réponse à l'utilisateur
         await sendMessage(senderId, reply);
