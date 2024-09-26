@@ -39,7 +39,7 @@ const handleMessage = async (event) => {
     // Vérifier s'il existe une commande active pour cet utilisateur
     if (activeCommands[senderId]) {
         const activeCommand = activeCommands[senderId];
-        await commands[activeCommand](senderId, message.text); // Exécuter la commande active
+        await commands[activeCommand].execute(senderId, message.text); // Exécuter la commande active
         return;
     }
 
@@ -49,7 +49,7 @@ const handleMessage = async (event) => {
         if (userText.startsWith(commandName)) {
             const commandPrompt = userText.replace(commandName, '').trim();
             activeCommands[senderId] = commandName; // Activer cette commande pour les futurs messages
-            await commands[commandName](senderId, commandPrompt); // Appeler la commande
+            await commands[commandName].execute(senderId, commandPrompt); // Appeler la commande
             return; // Sortir après l'exécution de la commande
         }
     }
