@@ -18,8 +18,8 @@ ${formattedMenu}
 ├─────⭔
 │ Page [ 1/1 ]  // Vous pouvez ajouter la logique de pagination si nécessaire
 │ Actuellement, le bot a ${commandNames.length} commandes qui peuvent être utilisées
-│ » Tapez -help <page> pour voir la liste des commandes
-│ » Tapez -help pour voir les détails de l'utilisation de cette commande
+│ » Tapez menu <page> pour voir la liste des commandes
+│ » Tapez menu pour voir les détails de l'utilisation de cette commande
 ├────────⭔
 │ 💕❤Bruno❤💕
 ╰─────────────⭓`;
