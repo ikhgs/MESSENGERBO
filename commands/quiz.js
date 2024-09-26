@@ -34,8 +34,8 @@ module.exports = async (senderId, prompt) => {
 
 async function askNewQuestion(senderId) {
     try {
-        // Appeler l'API Open Trivia Database pour obtenir une question
-        const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
+        // Appeler l'API Open Trivia Database pour obtenir une question en français
+        const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple&language=fr';
         const response = await axios.get(apiUrl);
 
         // Vérifier si l'API a renvoyé une question avec succès
