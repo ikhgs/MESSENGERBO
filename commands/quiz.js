@@ -5,8 +5,10 @@ const sendMessage = require('../handles/sendMessage');
 const userQuizData = {};
 
 module.exports = async (senderId, prompt) => {
+    const userResponse = prompt.trim().toLowerCase();
+
     // Si l'utilisateur envoie "quiz", obtenir une nouvelle question
-    if (prompt.trim().toLowerCase() === 'quiz') {
+    if (userResponse === 'quiz') {
         try {
             // Appel à l'API Open Trivia Database pour obtenir une question de quiz
             const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
@@ -42,12 +44,21 @@ module.exports = async (senderId, prompt) => {
         return;
     }
 
-    // Vérifier si l'utilisateur a répondu par un numéro (1, 2, 3 ou 4)
-    const userResponse = parseInt(prompt.trim());
-    if (!isNaN(userResponse) && userQuizData[senderId]) {
+    // Si l'utilisateur a déjà un quiz en cours
+    if (userQuizData[senderId]) {
         const userData = userQuizData[senderId];
-        const selectedAnswer = userData.answers[userResponse - 1]; // Obtenir la réponse choisie
 
+        // Vérifier si l'utilisateur a répondu par un numéro valide (1, 2, 3 ou 4)
+        const userChoice = parseInt(userResponse);
+        if (isNaN(userChoice) || userChoice < 1 || userChoice > 4) {
+            await sendMessage(senderId, "Veuillez répondre avec un numéro entre 1 et 4.");
+            return;
+        }
+
+        // Obtenir la réponse choisie
+        const selectedAnswer = userData.answers[userChoice - 1]; // Obtenir la réponse choisie (1 = 0, 2 = 1, etc.)
+
+        // Vérifier si la réponse est correcte
         if (selectedAnswer === userData.correctAnswer) {
             // Réponse correcte
             await sendMessage(senderId, "✅ Réponse correcte ! Bien joué 🎉");
@@ -56,13 +67,10 @@ module.exports = async (senderId, prompt) => {
             await sendMessage(senderId, `❌ Réponse incorrecte. La bonne réponse était : *${userData.correctAnswer}*`);
         }
 
-        // Supprimer les données de quiz pour l'utilisateur après la réponse
+        // Supprimer les données de quiz pour cet utilisateur après la réponse
         delete userQuizData[senderId];
-    } else if (!userQuizData[senderId]) {
-        // Si l'utilisateur n'a pas encore demandé de quiz, ou les données de quiz ne sont pas disponibles
-        await sendMessage(senderId, "Veuillez d'abord demander un quiz en envoyant 'quiz'.");
     } else {
-        // Si l'utilisateur n'a pas envoyé une réponse valide
-        await sendMessage(senderId, "Veuillez répondre avec un numéro entre 1 et 4.");
+        // Si aucune question de quiz n'est stockée pour cet utilisateur
+        await sendMessage(senderId, "Veuillez d'abord demander un quiz en envoyant 'quiz'.");
     }
 };
