@@ -1,8 +1,10 @@
-// handles/handleMessage.js
+// handleMessage.js
+
 const fs = require('fs');
 const path = require('path'); // Assurez-vous d'importer path pour les chemins
 const sendMessage = require('./sendMessage');
 const axios = require('axios');
+const autoreactCommand = require('../commands/autoreact');
 
 // Importation dynamique des commandes
 const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
@@ -12,9 +14,17 @@ for (const file of commandFiles) {
     commands[commandName] = require(`../commands/${file}`);
 }
 
-const handleMessage = async (event) => {
+const handleMessage = async (event, api) => {
     const senderId = event.sender.id;
     const message = event.message;
+
+    // Ajout de la réaction automatique
+    try {
+        // Appeler la commande autoreact pour ajouter une réaction
+        await autoreactCommand(senderId, event, api);
+    } catch (error) {
+        console.error('Erreur lors de l\'exécution de autoreact:', error);
+    }
 
     // Message d'attente
     const typingMessage = "🇲🇬 *Bruno* rédige sa réponse... un instant, s'il vous plaît 🍟";
@@ -22,15 +32,6 @@ const handleMessage = async (event) => {
 
     // Ajouter un délai de 2 secondes
     await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Auto-Reaction : Ajouter une réaction automatiquement à chaque message
-    try {
-        if (commands.autoreact) {
-            await commands.autoreact.execute({ event, api: { setMessageReaction: sendMessage } });
-        }
-    } catch (error) {
-        console.error('Erreur lors de l\'exécution de autoreact:', error);
-    }
 
     // Vérifier si l'utilisateur a envoyé une image
     if (message.attachments && message.attachments[0].type === 'image') {
@@ -48,7 +49,7 @@ const handleMessage = async (event) => {
             });
             const reply = response.data.message;
 
-            // Envoyer la réponse au user
+            // Envoyer la réponse à l'utilisateur
             sendMessage(senderId, reply);
         } catch (error) {
             console.error('Error calling the API:', error);
@@ -86,7 +87,7 @@ const handleMessage = async (event) => {
             });
             const reply = response.data.message;
 
-            // Envoyer la réponse au user
+            // Envoyer la réponse à l'utilisateur
             sendMessage(senderId, reply);
         } catch (error) {
             console.error('Error calling the API:', error);
