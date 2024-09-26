@@ -58,8 +58,11 @@ module.exports = async (senderId, prompt) => {
 
         // Supprimer les données de quiz pour l'utilisateur après la réponse
         delete userQuizData[senderId];
-    } else {
-        // Si l'utilisateur n'a pas répondu par un numéro valide ou n'a pas de question en attente
+    } else if (!userQuizData[senderId]) {
+        // Si l'utilisateur n'a pas encore demandé de quiz, ou les données de quiz ne sont pas disponibles
         await sendMessage(senderId, "Veuillez d'abord demander un quiz en envoyant 'quiz'.");
+    } else {
+        // Si l'utilisateur n'a pas envoyé une réponse valide
+        await sendMessage(senderId, "Veuillez répondre avec un numéro entre 1 et 4.");
     }
 };
