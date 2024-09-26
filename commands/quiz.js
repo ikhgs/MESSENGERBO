@@ -1,63 +1,65 @@
 const axios = require('axios');
 const sendMessage = require('../handles/sendMessage');
 
-let currentQuestion = null; // Variable pour stocker la question actuelle
-let currentAnswer = null; // Variable pour stocker la réponse correcte
+// Stocker la question et la réponse correcte pour chaque utilisateur
+const userQuizData = {};
 
-// Fonction pour récupérer une question aléatoire
-const fetchQuestion = async () => {
-    try {
-        const response = await axios.get(`https://opentdb.com/api.php?amount=1&type=multiple`);
-        
-        // Vérification de la réponse
-        if (response.data && response.data.results.length > 0) {
-            return response.data.results[0]; // Retourne la première question
-        } else {
-            console.error('Aucune question trouvée dans la réponse de l\'API.');
-            return null;
-        }
-    } catch (error) {
-        console.error('Erreur lors de la récupération de la question:', error);
-        return null;
-    }
-};
+module.exports = async (senderId, prompt) => {
+    // Si l'utilisateur envoie "quiz", obtenir une nouvelle question
+    if (prompt.trim().toLowerCase() === 'quiz') {
+        try {
+            // Appel à l'API Open Trivia Database pour obtenir une question de quiz
+            const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
+            const response = await axios.get(apiUrl);
+            const questionData = response.data.results[0];
 
-const quizCommand = async (senderId, userText) => {
-    // Si l'utilisateur envoie "quiz", récupérer et envoyer une question
-    if (userText.trim().toLowerCase() === 'quiz') {
-        currentQuestion = await fetchQuestion();
-        if (currentQuestion) {
-            // Stocker la réponse correcte
-            currentAnswer = currentQuestion.correct_answer;
-            let options = [...currentQuestion.incorrect_answers, currentAnswer];
-            options = options.sort(() => Math.random() - 0.5); // Mélanger les options
-            let reply = `Question: ${currentQuestion.question}\n`;
-            options.forEach((option, index) => {
-                reply += `${index + 1}: ${option}\n`;
+            // Extraire les informations de la question
+            const question = questionData.question;
+            const correctAnswer = questionData.correct_answer;
+            const incorrectAnswers = questionData.incorrect_answers;
+
+            // Mélanger les réponses (correcte + incorrectes)
+            const answers = [...incorrectAnswers, correctAnswer].sort(() => Math.random() - 0.5);
+
+            // Stocker la question et la réponse correcte pour l'utilisateur
+            userQuizData[senderId] = {
+                correctAnswer: correctAnswer,
+                answers: answers
+            };
+
+            // Construire le message de la question avec les options
+            let message = `🧠 *Question Quiz :*\n${question}\n\n`;
+            answers.forEach((answer, index) => {
+                message += `${index + 1}. ${answer}\n`; // Afficher les réponses avec les numéros
             });
-            sendMessage(senderId, reply);
-        } else {
-            sendMessage(senderId, 'Désolé, je n\'ai pas pu récupérer une question.');
+
+            // Envoyer la question à l'utilisateur
+            await sendMessage(senderId, message);
+        } catch (error) {
+            console.error('Erreur lors de l\'appel à l\'API Open Trivia Database:', error);
+            await sendMessage(senderId, "Désolé, une erreur s'est produite lors de la récupération du quiz.");
         }
         return;
     }
 
-    // Vérifier si l'utilisateur a envoyé une réponse
-    const answer = parseInt(userText.trim());
-    if (!isNaN(answer) && currentQuestion) {
-        const userResponse = currentQuestion.incorrect_answers.concat(currentAnswer);
-        if (userResponse[answer - 1] === currentAnswer) {
-            sendMessage(senderId, 'Réponse correcte ! 🎉');
-        } else {
-            sendMessage(senderId, `Réponse incorrecte. La bonne réponse est : ${currentAnswer}`);
-        }
-        // Réinitialiser pour une nouvelle question
-        currentQuestion = null;
-        currentAnswer = null;
-        return;
-    }
+    // Vérifier si l'utilisateur a répondu par un numéro (1, 2, 3 ou 4)
+    const userResponse = parseInt(prompt.trim());
+    if (!isNaN(userResponse) && userQuizData[senderId]) {
+        const userData = userQuizData[senderId];
+        const selectedAnswer = userData.answers[userResponse - 1]; // Obtenir la réponse choisie
 
-    sendMessage(senderId, 'Veuillez entrer une réponse valide.');
+        if (selectedAnswer === userData.correctAnswer) {
+            // Réponse correcte
+            await sendMessage(senderId, "✅ Réponse correcte ! Bien joué 🎉");
+        } else {
+            // Réponse incorrecte, envoyer la correction
+            await sendMessage(senderId, `❌ Réponse incorrecte. La bonne réponse était : *${userData.correctAnswer}*`);
+        }
+
+        // Supprimer les données de quiz pour l'utilisateur après la réponse
+        delete userQuizData[senderId];
+    } else {
+        // Si l'utilisateur n'a pas répondu par un numéro valide ou n'a pas de question en attente
+        await sendMessage(senderId, "Veuillez d'abord demander un quiz en envoyant 'quiz'.");
+    }
 };
-
-module.exports = quizCommand;
