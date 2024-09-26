@@ -1,70 +1,85 @@
 const axios = require('axios');
 const sendMessage = require('../handles/sendMessage'); // Importer la fonction sendMessage
 
-// Objet pour stocker les questions et les réponses pour chaque utilisateur
-const userQuizzes = {};
+// Stocker l'état du quiz pour chaque utilisateur
+const quizState = {};
 
 module.exports = async (senderId, prompt) => {
     try {
-        // Vérifier si l'utilisateur a déjà un quiz en cours
-        if (userQuizzes[senderId]) {
-            const userAnswer = prompt.trim(); // Réponse de l'utilisateur
-            const correctAnswer = userQuizzes[senderId].correctAnswer;
+        // Si l'utilisateur demande un quiz
+        if (prompt.trim().toLowerCase() === 'quiz') {
+            // Envoyer un message de confirmation que le message a été reçu
+            await sendMessage(senderId, "Message reçu, je prépare une réponse...");
+            
+            // Appeler l'API pour obtenir une question de quiz
+            const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
+            const response = await axios.get(apiUrl);
 
-            // Vérifier la réponse de l'utilisateur
-            if (userAnswer === correctAnswer) {
-                await sendMessage(senderId, "🎉 Réponse correcte !");
-            } else {
-                await sendMessage(senderId, `❌ Réponse incorrecte. La bonne réponse est : ${correctAnswer}.`);
-            }
+            // Récupérer les données de la question
+            const questionData = response.data.results[0];
+            const question = questionData.question;
+            const correctAnswer = questionData.correct_answer;
+            const incorrectAnswers = questionData.incorrect_answers;
 
-            // Supprimer le quiz en cours pour cet utilisateur
-            delete userQuizzes[senderId];
-            return; // Terminer l'exécution ici pour ne pas poser une nouvelle question
-        }
+            // Créer une liste des réponses possibles
+            const options = [correctAnswer, ...incorrectAnswers].sort(() => Math.random() - 0.5);
 
-        // Envoyer un message de confirmation que le message a été reçu
-        await sendMessage(senderId, "Message reçu, je prépare une réponse...");
-
-        // Appeler l'API Open Trivia Database pour obtenir une question
-        const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
-        const response = await axios.get(apiUrl);
-
-        // Vérifier si l'API a renvoyé une question avec succès
-        if (response.data.response_code === 0) {
-            // Récupérer la question et les réponses
-            const quizData = response.data.results[0];
-            const question = quizData.question;
-            const correctAnswer = quizData.correct_answer;
-            const incorrectAnswers = quizData.incorrect_answers;
-
-            // Créer un tableau des réponses possibles
-            const allAnswers = [correctAnswer, ...incorrectAnswers];
-            const shuffledAnswers = allAnswers.sort(() => Math.random() - 0.5); // Mélanger les réponses
-
-            // Stocker les données du quiz pour cet utilisateur
-            userQuizzes[senderId] = {
+            // Stocker l'état du quiz pour cet utilisateur
+            quizState[senderId] = {
                 question: question,
                 correctAnswer: correctAnswer,
-                shuffledAnswers: shuffledAnswers,
+                options: options
             };
 
-            // Formater la réponse à envoyer à l'utilisateur
-            const formattedAnswers = shuffledAnswers.map((answer, index) => `${index + 1}. ${answer}`).join('\n');
-
-            // Attendre 2 secondes avant d'envoyer la réponse
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // Envoyer la question et les réponses mélangées à l'utilisateur
-            await sendMessage(senderId, `Voici votre question de quiz :\n${question}\n\nChoisissez une réponse :\n${formattedAnswers}`);
+            // Envoyer la question et les options à l'utilisateur
+            const optionsText = options.map((opt, index) => `${index + 1}. ${opt}`).join('\n');
+            await sendMessage(senderId, `Voici votre question de quiz :\n${question}\nChoisissez une réponse :\n${optionsText}`);
         } else {
-            await sendMessage(senderId, "Désolé, une erreur s'est produite lors de la récupération du quiz.");
+            // Vérifier si l'utilisateur a déjà demandé un quiz
+            const currentQuiz = quizState[senderId];
+            if (currentQuiz) {
+                // Vérifier la réponse de l'utilisateur
+                const userAnswerIndex = parseInt(prompt.trim()) - 1;
+                if (userAnswerIndex >= 0 && userAnswerIndex < currentQuiz.options.length) {
+                    const userAnswer = currentQuiz.options[userAnswerIndex];
+                    // Envoyer un message d'attente
+                    await sendMessage(senderId, "🇲🇬 *Bruno* rédige sa réponse... un instant, s'il vous plaît 🍟");
+
+                    // Vérifier si la réponse est correcte
+                    if (userAnswer === currentQuiz.correctAnswer) {
+                        await sendMessage(senderId, "✅ Réponse correcte !");
+                    } else {
+                        await sendMessage(senderId, `❌ Réponse incorrecte. La bonne réponse est : ${currentQuiz.correctAnswer}.`);
+                    }
+
+                    // Appeler à nouveau l'API pour obtenir une nouvelle question
+                    const apiUrl = 'https://opentdb.com/api.php?amount=1&type=multiple';
+                    const response = await axios.get(apiUrl);
+                    const newQuestionData = response.data.results[0];
+                    const newQuestion = newQuestionData.question;
+                    const newCorrectAnswer = newQuestionData.correct_answer;
+                    const newIncorrectAnswers = newQuestionData.incorrect_answers;
+                    const newOptions = [newCorrectAnswer, ...newIncorrectAnswers].sort(() => Math.random() - 0.5);
+
+                    // Mettre à jour l'état du quiz
+                    quizState[senderId] = {
+                        question: newQuestion,
+                        correctAnswer: newCorrectAnswer,
+                        options: newOptions
+                    };
+
+                    // Envoyer la nouvelle question à l'utilisateur
+                    const newOptionsText = newOptions.map((opt, index) => `${index + 1}. ${opt}`).join('\n');
+                    await sendMessage(senderId, `Voici votre nouvelle question de quiz :\n${newQuestion}\nChoisissez une réponse :\n${newOptionsText}`);
+                } else {
+                    await sendMessage(senderId, "Veuillez envoyer un numéro valide pour votre réponse.");
+                }
+            } else {
+                await sendMessage(senderId, "Veuillez d'abord demander un quiz en envoyant 'quiz'.");
+            }
         }
     } catch (error) {
-        console.error('Erreur lors de l\'appel à l\'API Open Trivia Database:', error);
-        
-        // Envoyer un message d'erreur à l'utilisateur en cas de problème
+        console.error('Erreur lors de l\'appel à l\'API de quiz:', error);
         await sendMessage(senderId, "Désolé, une erreur s'est produite lors du traitement de votre message.");
     }
 };
-    
