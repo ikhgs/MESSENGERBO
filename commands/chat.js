@@ -25,3 +25,10 @@ module.exports = async (senderId, prompt) => {
         await sendMessage(senderId, "Désolé, une erreur s'est produite lors du traitement de votre message.");
     }
 };
+
+// Ajouter les informations de la commande
+module.exports.info = {
+    name: "chat",  // Le nom de la commande
+    description: "Permet de discuter avec l'API GPT-3.5 Turbo.",  // Description de la commande
+    usage: "Envoyez 'chat <message>' pour poser une question ou démarrer une conversation."  // Comment utiliser la commande
+};
