@@ -1,71 +1,74 @@
 const fs = require('fs');
 const path = require('path');
 const sendMessage = require('./sendMessage');
-const userStates = {}; // Stocker l'état des utilisateurs
-const commandsPath = path.join(__dirname, '../commands'); // Chemin vers le dossier des commandes
+const axios = require('axios');
 
-// Charger dynamiquement les commandes
+// Lire et importer dynamiquement toutes les commandes dans le répertoire "commands"
+const commandFiles = fs.readdirSync(path.join(__dirname, '../commands')).filter(file => file.endsWith('.js'));
 const commands = {};
-fs.readdirSync(commandsPath).forEach(file => {
-    if (file.endsWith('.js')) {
-        const commandName = file.replace('.js', '').toUpperCase(); // Le nom de la commande
-        commands[commandName] = require(path.join(commandsPath, file));
-    }
-});
 
-module.exports = function handleMessage(event) {
-    const senderId = event.sender.id;
-    const message = event.message.text.toLowerCase(); // Normaliser le texte du message
+// Charger chaque commande en tant que module
+for (const file of commandFiles) {
+    const commandName = file.replace('.js', ''); // Retirer l'extension .js pour obtenir le nom de la commande
+    commands[commandName] = require(`../commands/${file}`); // Importer le fichier de commande
+}
 
-    // Si l'utilisateur envoie "stop", réinitialiser l'état
-    if (message === 'stop') {
-        userStates[senderId] = null;
-        sendPostbackOptions(senderId); // Afficher à nouveau les options "Menu" et "Gemini"
-    } else if (message === 'fin') {
-        // Réinitialiser les états et afficher les options Menu et Gemini
-        userStates[senderId] = null;
-        sendPostbackOptions(senderId);
-    } else if (!userStates[senderId]) {
-        // Si aucune commande active, afficher les boutons "Menu" et "Gemini"
-        sendPostbackOptions(senderId);
-    } else {
-        // Dynamique gestion des commandes
-        const currentState = userStates[senderId];
-        if (commands[currentState]) {
-            // Exécuter la commande si elle est définie
-            commands[currentState].handleMessage(senderId, message);
-        } else {
-            // Pour tout autre message, afficher les options Menu et Gemini
-            sendPostbackOptions(senderId);
-        }
-    }
+console.log('Les commandes suivantes ont été chargées :', Object.keys(commands));
+
+// Stocker les commandes actives pour chaque utilisateur
+const activeCommands = {};
+
+const handleMessage = async (event) => {
+    const senderId = event.sender.id;
+    const message = event.message;
+
+    // Message d'attente
+    const typingMessage = "🇲🇬 *Bruno* rédige sa réponse... un instant, s'il vous plaît 🍟";
+    await sendMessage(senderId, typingMessage); // Envoyer le message d'attente
+
+    // Ajouter un délai de 2 secondes
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Si l'utilisateur envoie "stop", désactiver la commande active
+    if (message.text.toLowerCase() === 'stop') {
+        activeCommands[senderId] = null;
+        await sendMessage(senderId, "La commande est désactivée. Gemini reprend.");
+        return;
+    }
+
+    // Vérifier s'il existe une commande active pour cet utilisateur
+    if (activeCommands[senderId]) {
+        const activeCommand = activeCommands[senderId];
+        await commands[activeCommand](senderId, message.text); // Exécuter la commande active
+        return;
+    }
+
+    // Vérifier les commandes dynamiques
+    const userText = message.text.trim().toLowerCase();
+    for (const commandName in commands) {
+        if (userText.startsWith(commandName)) {
+            const commandPrompt = userText.replace(commandName, '').trim();
+            activeCommands[senderId] = commandName; // Activer cette commande pour les futurs messages
+            await commands[commandName](senderId, commandPrompt); // Appeler la commande
+            return; // Sortir après l'exécution de la commande
+        }
+    }
+
+    // Si aucune commande ne correspond, appeler l'API Gemini par défaut
+    const prompt = message.text;
+    const customId = senderId;
+
+    try {
+        const response = await axios.post('https://gemini-ap-espa-bruno.onrender.com/api/gemini', {
+            prompt,
+            customId
+        });
+        const reply = response.data.message;
+        sendMessage(senderId, reply);
+    } catch (error) {
+        console.error('Error calling the API:', error);
+        sendMessage(senderId, 'Désolé, une erreur s\'est produite lors du traitement de votre message.');
+    }
 };
 
-// Fonction pour afficher les options "Menu" et "Gemini"
-function sendPostbackOptions(senderId) {
-    const message = {
-        recipient: { id: senderId },
-        message: {
-            attachment: {
-                type: "template",
-                payload: {
-                    template_type: "button",
-                    text: "Que souhaitez-vous faire?",
-                    buttons: [
-                        {
-                            type: "postback",
-                            title: "Menu",
-                            payload: "MENU"
-                        },
-                        {
-                            type: "postback",
-                            title: "Gemini",
-                            payload: "GEMINI"
-                        }
-                    ]
-                }
-            }
-        }
-    };
-    sendMessage(message);
-}
+module.exports = handleMessage;
