@@ -2,20 +2,25 @@ const axios = require('axios');
 const sendMessage = require('../handles/sendMessage');
 
 const catCommand = async (senderId) => {
+    // Message d'attente
+    sendMessage(senderId, "Recherche d'une image de chat... 🐱");
+
     try {
-        // Appel à l'API Cat pour obtenir une image de chat
+        // Appel à l'API pour obtenir une image de chat
         const response = await axios.get('https://api.thecatapi.com/v1/images/search');
-        const catImageUrl = response.data[0].url; // Récupérer l'URL de l'image
-
-        // Envoyer l'image au destinataire
-        const messageContent = {
-            files: [catImageUrl] // Mettre l'URL de l'image dans un tableau
-        };
-        await sendMessage(senderId, messageContent);
-
+        
+        // Vérifier si l'API a renvoyé une image
+        if (response.data && response.data.length > 0) {
+            const catImageUrl = response.data[0].url; // URL de l'image de chat
+            
+            // Envoyer l'image au utilisateur
+            sendMessage(senderId, { files: [catImageUrl] });
+        } else {
+            sendMessage(senderId, "Désolé, je n'ai pas trouvé d'image de chat.");
+        }
     } catch (error) {
-        console.error('Erreur lors de la récupération de l\'image du chat:', error);
-        sendMessage(senderId, 'Désolé, une erreur s\'est produite lors de la récupération d\'une image de chat.');
+        console.error('Erreur lors de l\'appel à l\'API de chat:', error);
+        sendMessage(senderId, "Désolé, une erreur s'est produite lors de la récupération de l'image de chat.");
     }
 };
 
