@@ -6,9 +6,9 @@ const handlePostback = (event) => {
 
     // Traitement de différents types de postbacks
     if (payload === 'GET_STARTED') {
-        sendMessage(senderId, "Welcome! Please send me an image to start.");
+        sendMessage(senderId, "Bienvenue ! Veuillez m'envoyer une image pour commencer.");
     } else {
-        sendMessage(senderId, "I didn't understand that action.");
+        sendMessage(senderId, "Je n'ai pas compris cette action.");
     }
 };
 
