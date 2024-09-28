@@ -1,61 +1,76 @@
 const axios = require('axios');
 const sendMessage = require('../handles/sendMessage');
 
-const waifuCommand = async (senderId, userText) => {
-    // Extraire le nom du personnage recherché
-    const characterName = userText.trim();
+// Stocker l'état des utilisateurs (s'ils ont utilisé 'waifu' récemment)
+let userHasUsedWaifu = {};
+
+module.exports = async (senderId, userText) => {
+    let characterName;
+
+    // Si l'utilisateur utilise "waifu <nom>", on active l'état 'waifu' pour cet utilisateur
+    if (userText.toLowerCase().startsWith('waifu')) {
+        characterName = userText.slice(6).trim();  // Supprimer 'waifu' et les espaces vides
+        userHasUsedWaifu[senderId] = true;  // Activer l'état waifu pour cet utilisateur
+    } else if (userHasUsedWaifu[senderId]) {
+        // Si l'utilisateur n'a pas utilisé 'waifu' mais a déjà utilisé la commande avant
+        characterName = userText.trim();
+    } else {
+        // Si l'utilisateur n'a jamais utilisé 'waifu', on leur demande d'entrer la commande correctement
+        await sendMessage(senderId, 'Veuillez d\'abord utiliser la commande "waifu <nom>" pour commencer.');
+        return;
+    }
 
     // Vérifier si le nom du personnage est vide
     if (!characterName) {
-        sendMessage(senderId, 'Veuillez fournir le nom d\'un personnage pour que je puisse vous aider.');
+        await sendMessage(senderId, 'Veuillez fournir un nom de personnage pour que je puisse vous aider.');
         return;
     }
 
     try {
         // Envoyer un message de confirmation que la requête est en cours de traitement
-        console.log("Processing request for:", characterName); // Log pour vérifier que la requête démarre
-        sendMessage(senderId, { message: { text: "Message reçu, je prépare une réponse..." }});
+        await sendMessage(senderId, `Recherche en cours pour : ${characterName}`);
 
-        // Appeler l'API Waifu avec le nom du personnage fourni
+        // Appeler l'API avec le nom du personnage
         const apiUrl = `https://waifu-info.vercel.app/kshitiz?name=${encodeURIComponent(characterName)}`;
+        console.log(`Appel à l'API avec URL: ${apiUrl}`); // Log de l'URL
+        
         const response = await axios.get(apiUrl);
 
-        // Vérifier si la réponse de l'API est correcte
-        console.log("API Response:", response.data);
+        console.log('Réponse de l\'API:', response.data); // Log des données reçues
 
-        // Récupérer les données de l'API
+        // Récupérer les données de la réponse de l'API
         const { name, image, info } = response.data;
 
-        // Construire le message de réponse (texte et image)
-        const messageData = {
-            recipient: {
-                id: senderId
-            },
-            message: {
+        // Vérifier que les données existent dans la réponse
+        if (!name || !image || !info) {
+            console.log('Données manquantes dans la réponse API:', response.data); // Log si les données sont manquantes
+            await sendMessage(senderId, `Désolé, je n'ai pas trouvé d'informations sur "${characterName}".`);
+            return;
+        }
+
+        // Construire le message de réponse formaté (texte et image)
+        const reply = `**Nom :** ${name}\n**Info :** ${info}`;
+
+        // Envoyer le texte de la réponse
+        await sendMessage(senderId, reply);
+
+        // Envoyer l'image séparément si l'API ou la plateforme le permet
+        if (image) {
+            await sendMessage(senderId, {
                 attachment: {
                     type: "image",
                     payload: {
-                        url: image, // URL de l'image à envoyer
-                        is_reusable: true // Réutiliser l'image sur d'autres messages
+                        url: image,  // URL de l'image
+                        is_reusable: true
                     }
                 }
-            }
-        };
-
-        // Envoyer l'image
-        console.log("Sending image...");
-        sendMessage(senderId, messageData);
-
-        // Envoyer ensuite le texte (info sur le personnage)
-        const replyText = `**Nom :** ${name}\n**Info :** ${info}`;
-        console.log("Sending text...");
-        sendMessage(senderId, { message: { text: replyText } });
-
+            });
+        }
     } catch (error) {
-        // En cas d'erreur, afficher l'erreur et envoyer un message d'erreur à l'utilisateur
-        console.error('Erreur lors de l\'appel à l\'API Waifu:', error.message);
-        sendMessage(senderId, { message: { text: 'Désolé, une erreur s\'est produite lors du traitement de votre demande.' } });
+        // Enregistrer les détails de l'erreur
+        console.error('Erreur lors de l\'appel à l\'API Waifu:', error.response ? error.response.data : error.message);
+        
+        // Envoyer un message d'erreur à l'utilisateur
+        await sendMessage(senderId, 'Désolé, une erreur s\'est produite lors du traitement de votre demande.');
     }
 };
-
-module.exports = waifuCommand;
